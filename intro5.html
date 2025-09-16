@@ -13,8 +13,32 @@
         .font-tech-mono { font-family: 'Share Tech Mono', monospace; }
         #particle-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
         #video-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; z-index: 2; }
-        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 1.5s ease-in-out, transform 8s linear; transform: scale(1.05); }
-        .slide.active { opacity: 1; transform: scale(1.15); }
+        
+        /* --- MODIFIED CSS FOR TRANSITION --- */
+        .slide { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            opacity: 0; 
+            transform: scale(1.15); /* Start slightly zoomed in */
+            transition: opacity 1.5s ease-in-out, transform 1.5s ease-in-out; 
+        }
+        .slide.active { 
+            opacity: 1; 
+            transform: scale(1.0); /* Zoom to normal size */
+            transition-duration: 1.5s, 8s; /* Opacity transition is 1.5s, transform (pan) is 8s */
+            transition-timing-function: ease-in-out, linear;
+            transform: scale(1.1); /* This is the new 'panning' effect target */
+        }
+        .slide.exiting {
+            opacity: 0;
+            transform: scale(0.95); /* Shrink slightly on exit */
+            transition: opacity 1.5s ease-in-out, transform 1.5s ease-in-out;
+        }
+        /* --- END MODIFIED CSS --- */
+
         .slide img, .slide video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
         .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(ellipse at center, rgba(10, 10, 10, 0.4) 0%, rgba(10, 10, 10, 0.9) 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; z-index: 3; }
         .text-slide { position: absolute; opacity: 0; transition: opacity 1s ease-in-out, transform 1s ease-in-out; transform: translateY(20px); }
@@ -65,9 +89,9 @@
 
             // --- Playlist Configuration ---
             const mediaPlaylist = [
-                { type: 'video', src: 'VID_20240911_132457.mp4', startTime: 25, endTime: 38 },
+                { type: 'video', src: 'VID_20240911_132457-2-2.mp4', startTime: 25, endTime: 38 },
                 { type: 'image', src: 'DSC_0596.jpg', duration: 6 },
-                { type: 'video', src: 'VID_20240911_131236.mp4', startTime: 1, endTime: 5 },
+                { type: 'video', src: 'VID_20240911_131236-2.mp4', startTime: 1, endTime: 5 },
                 { type: 'image', src: 'DSC_0731.jpg', duration: 6 },
                 { type: 'video', src: 'VID-20250215-WA0058.mp4', startTime: 2, endTime: 7 },
                 { type: 'video', src: 'VID_20250215_144222.mp4', startTime: 56, endTime: 61 },
@@ -127,14 +151,21 @@
                 });
             }
 
+            // --- MODIFIED JS FUNCTION FOR TRANSITION ---
             function updateSlide() {
                 // Deactivate previous slide
                 if (currentSlide > -1) {
                     const prevSlideDiv = document.getElementById(`slide-${currentSlide}`);
                     if (prevSlideDiv) {
                         prevSlideDiv.classList.remove('active');
+                        prevSlideDiv.classList.add('exiting'); // Add exiting class
                         const prevVideo = prevSlideDiv.querySelector('video');
                         if (prevVideo) prevVideo.pause();
+                        
+                        // Clean up the exiting class after the transition to reset the slide
+                        setTimeout(() => {
+                            prevSlideDiv.classList.remove('exiting');
+                        }, 1500);
                     }
                     document.getElementById(`text-${currentSlide}`)?.classList.remove('active');
                 }
@@ -173,6 +204,7 @@
                 // Set timeout for the next slide
                 slideTimeout = setTimeout(updateSlide, currentMedia.duration * 1000);
             }
+            // --- END MODIFIED JS FUNCTION ---
 
             function startVideo() {
                 playMusic();
@@ -207,11 +239,11 @@
                 startScreen.querySelector('p').textContent = "Build The Future With Us.";
                 startButton.textContent = "Replay";
 
-                const activeSlide = document.querySelector('.slide.active');
+                const activeSlide = document.querySelector('.slide.active, .slide.exiting');
                 if (activeSlide) {
                     const video = activeSlide.querySelector('video');
                     if (video) video.pause();
-                    activeSlide.classList.remove('active');
+                    activeSlide.classList.remove('active', 'exiting');
                 }
                 document.querySelector('.text-slide.active')?.classList.remove('active');
                 progressContainer.classList.add('hidden');
@@ -224,7 +256,40 @@
             // --- Helper & Event Listener Functions ---
             let synth, musicStarted = false;
             const bootSequence = ['Booting MechaCore OS v2.5...', 'Initializing modules... [OK]', 'Connecting to neural network... [OK]', 'Loading creative drivers... [OK]', 'Compiling project showcases... [DONE]', 'Reticulating splines... [COMPLETE]', 'Preparing presentation...', 'Launch sequence initiated.'];
-            function runTerminal() { let lineIndex = 0; let charIndex = 0; terminal.innerHTML = ''; function typeLine() { if (lineIndex < bootSequence.length) { const line = bootSequence[lineIndex]; if (charIndex < line.length) { terminal.innerHTML += line.charAt(charIndex); typingSound.currentTime = 0; typingSound.play(); charIndex++; setTimeout(typeLine, 50 + Math.random() * 40); } else { terminal.innerHTML += '<br>'; lineIndex++; charIndex = 0; setTimeout(typeLine, 400 + Math.random() * 300); } } else { terminal.innerHTML += '<span class="cursor"></span>'; setTimeout(() => { terminalContainer.style.opacity = '0'; setTimeout(() => { terminalContainer.style.display = 'none'; startVideo(); }, 1000); }, 1000); } } typeLine(); }
+            
+            function runTerminal() {
+                let lineIndex = 0;
+                let charIndex = 0;
+                terminal.innerHTML = '';
+                function typeLine() {
+                    if (lineIndex < bootSequence.length) {
+                        const line = bootSequence[lineIndex];
+                        if (charIndex < line.length) {
+                            terminal.innerHTML += line.charAt(charIndex);
+                            typingSound.currentTime = 0;
+                            typingSound.play().catch(e => {});
+                            charIndex++;
+                            setTimeout(typeLine, 30); // Classic Tech character speed
+                        } else {
+                            terminal.innerHTML += '<br>';
+                            lineIndex++;
+                            charIndex = 0;
+                            setTimeout(typeLine, 200); // Classic Tech line break speed
+                        }
+                    } else {
+                        terminal.innerHTML += '<span class="cursor"></span>';
+                        setTimeout(() => {
+                            terminalContainer.style.opacity = '0';
+                            setTimeout(() => {
+                                terminalContainer.style.display = 'none';
+                                startVideo();
+                            }, 1000);
+                        }, 1000);
+                    }
+                }
+                typeLine();
+            }
+
             function startIntroSequence() { Tone.start(); startScreen.style.transition = 'opacity 0.5s ease'; startScreen.style.opacity = '0'; setTimeout(() => startScreen.style.display = 'none', 500); setTimeout(() => { terminalContainer.style.display = 'flex'; setTimeout(() => { terminalContainer.style.opacity = '1'; runTerminal(); }, 100); }, 500); }
             function playMusic() { if (musicStarted) return; synth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'fmsquare' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.2, release: 1 } }).toDestination(); const pattern = new Tone.Pattern((time, note) => { synth.triggerAttackRelease(note, '8n', time); }, ['C3', 'E3', 'G3', 'B3', 'C4', 'B3', 'G3', 'E3'], 'randomWalk'); pattern.interval = '8n'; Tone.Transport.bpm.value = 100; Tone.Transport.start(); pattern.start(0); musicStarted = true; }
             function typeWriter(element, text, speed = 50) { element.innerHTML = ""; let i = 0; function type() { if (i < text.length) { element.innerHTML += text.charAt(i); i++; setTimeout(type, speed); } } type(); }
